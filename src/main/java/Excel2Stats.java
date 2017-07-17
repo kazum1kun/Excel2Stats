@@ -2,6 +2,7 @@ import javafx.application.Application;
 import javafx.event.ActionEvent;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
@@ -12,9 +13,14 @@ import javafx.stage.Stage;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 import org.apache.poi.hssf.usermodel.HSSFSheet;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellType;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.Arrays;
 
 
@@ -78,6 +84,11 @@ public class Excel2Stats extends Application {
         }
 
 
+        // The file that data being saved to
+        File saveToFile = new File(file.getParent() + "/" + file.getName() + "计算结果.txt");
+        // This contains the results in String
+        String resultStr = "";
+
         try {
             // Load the Excel file and default sheet (0)
             FileInputStream fis = new FileInputStream(file);
@@ -103,9 +114,25 @@ public class Excel2Stats extends Application {
             int count = 0;
             for (Integer i : colNum) {
                 DescriptiveStatistics stats = new DescriptiveStatistics();
-                for (int j = rowStart; j < rowEnd; j++) {
-                    Double currentCellVal = sheet.getRow(j).getCell(i).getNumericCellValue();
-                    stats.addValue(currentCellVal);
+                // Detect the format of the cell and convert them when necessary
+                // Check the first cell
+                Cell indicatorCell = sheet.getRow(rowStart).getCell(i);
+
+                // Numeric cells
+                if (indicatorCell.getCellTypeEnum() == CellType.NUMERIC) {
+                    for (int j = rowStart; j < rowEnd; j++) {
+                        Double currentCellVal = sheet.getRow(j).getCell(i).getNumericCellValue();
+                        stats.addValue(currentCellVal);
+                    }
+                }
+                // String cells (percentage stored as cell)
+                else if (indicatorCell.getCellTypeEnum() == CellType.STRING) {
+                    for (int j = rowStart; j < rowEnd; j++) {
+                        String currCellContent = sheet.getRow(j).getCell(i).getStringCellValue();
+                        Double numPercentage = new Double(currCellContent.trim().replace("%", ""))
+                                / 100.0;
+                        stats.addValue(numPercentage);
+                    }
                 }
 
                 // Calc the average
@@ -123,10 +150,33 @@ public class Excel2Stats extends Application {
                 count++;
             }
 
+            // Format the result
+            for (int i = 0; i < count; i++) {
+                int currColNum = ((int) results[i][0]);
+                resultStr = resultStr.concat("列[" + currColNum + "]，" + sheet.getRow(0)
+                        .getCell(currColNum).getStringCellValue() + "\n");
+                resultStr = resultStr.concat("平均值：\t" + results[i][1] + "\n");
+                resultStr = resultStr.concat("方差：\t" + results[i][2] + "\n");
+                resultStr = resultStr.concat("标准差：\t" + results[i][3] + "\n\n");
 
-        } catch (Exception ex) {
+            }
+        } catch (IOException ex) {
             System.out.println("ErrReadExcel");
         }
+
+        // Save the results
+        try {
+            Files.write(Paths.get(saveToFile.getPath()), resultStr.getBytes());
+        } catch (IOException ex) {
+            System.out.println("ErrWriteResult");
+        }
+
+        // Show a prompt with analysis result
+        Alert showResult = new Alert(Alert.AlertType.INFORMATION);
+        showResult.setTitle("计算结果");
+        showResult.setContentText(resultStr + "结果已保存到 " + saveToFile.getPath());
+        showResult.setHeaderText(null);
+        showResult.showAndWait();
     }
 
     // FileChooser to pick an Excel Worksheet
