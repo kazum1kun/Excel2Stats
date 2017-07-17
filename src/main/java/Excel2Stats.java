@@ -27,6 +27,7 @@ import java.util.Arrays;
 /**
  * Excel2Stats processes an external MS Excel (.xls) format and calculates the average, variance, and
  * standard deviation from the given data
+ * @version 0.1.0-ALPHA
  */
 public class Excel2Stats extends Application {
     // User selected Excel file
